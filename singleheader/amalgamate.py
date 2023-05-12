@@ -92,9 +92,8 @@ def dofile(fid, prepath, filename):
     with open(file, 'r') as fid2:
         for line in fid2:
             line = line.rstrip('\n')
-            s = includepattern.search(line)
-            if s:
-                includedfile = s.group(1)
+            if s := includepattern.search(line):
+                includedfile = s[1]
                 # include all from simdjson.cpp except simdjson.h
                 if includedfile == "simdjson.h" and filename == "simdjson.cpp":
                     print(line, file=fid)
@@ -104,18 +103,15 @@ def dofile(fid, prepath, filename):
                     includedfile = includedfile[2:]
                 # we explicitly include simdjson headers, one time each (unless they are generic, in which case multiple times is fine)
                 doinclude(fid, includedfile, line)
+            elif s := redefines_simdjson_implementation.search(line):
+                current_implementation = s[1]
+                print(f"// redefining SIMDJSON_IMPLEMENTATION to \"{current_implementation}\"\n// {line}", file=fid)
+            elif undefines_simdjson_implementation.search(line):
+                # Don't include #undef SIMDJSON_IMPLEMENTATION since we're handling it ourselves
+                print(f"// {line}")
             else:
-                # does it contain a redefinition of SIMDJSON_IMPLEMENTATION ?
-                s=redefines_simdjson_implementation.search(line)
-                if s:
-                    current_implementation=s.group(1)
-                    print(f"// redefining SIMDJSON_IMPLEMENTATION to \"{current_implementation}\"\n// {line}", file=fid)
-                elif undefines_simdjson_implementation.search(line):
-                    # Don't include #undef SIMDJSON_IMPLEMENTATION since we're handling it ourselves
-                    print(f"// {line}")
-                else:
-                    # copy the line, with SIMDJSON_IMPLEMENTATION replace to what it is currently defined to
-                    print(uses_simdjson_implementation.sub(current_implementation+"\\1",line), file=fid)
+                # copy the line, with SIMDJSON_IMPLEMENTATION replace to what it is currently defined to
+                print(uses_simdjson_implementation.sub(current_implementation+"\\1",line), file=fid)
     print(f"/* end file {OSRELFILE} */", file=fid)
 
 
@@ -139,20 +135,16 @@ DEMOCPP = os.path.join(AMALGAMATE_OUTPUT_PATH, "amalgamate_demo.cpp")
 README = os.path.join(AMALGAMATE_OUTPUT_PATH, "README.md")
 
 print(f"Creating {AMAL_H}")
-amal_h = open(AMAL_H, 'w')
-print(f"/* auto-generated on {timestamp}. Do not edit! */", file=amal_h)
-for h in ALLCHEADERS:
-    doinclude(amal_h, h, f"ERROR {h} not found")
-
-amal_h.close()
+with open(AMAL_H, 'w') as amal_h:
+    print(f"/* auto-generated on {timestamp}. Do not edit! */", file=amal_h)
+    for h in ALLCHEADERS:
+        doinclude(amal_h, h, f"ERROR {h} not found")
 
 print(f"Creating {AMAL_C}")
-amal_c = open(AMAL_C, 'w')
-print(f"/* auto-generated on {timestamp}. Do not edit! */", file=amal_c)
-for c in ALLCFILES:
-    doinclude(amal_c, c, f"ERROR {c} not found")
-
-amal_c.close()
+with open(AMAL_C, 'w') as amal_c:
+    print(f"/* auto-generated on {timestamp}. Do not edit! */", file=amal_c)
+    for c in ALLCFILES:
+        doinclude(amal_c, c, f"ERROR {c} not found")
 
 # copy the README and DEMOCPP
 if SCRIPTPATH != AMALGAMATE_OUTPUT_PATH:

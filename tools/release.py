@@ -13,13 +13,13 @@ if sys.version_info < (3, 0):
     sys.exit(1)
 
 def colored(r, g, b, text):
-    return "\033[38;2;{};{};{}m{} \033[38;2;255;255;255m".format(r, g, b, text)
+    return f"\033[38;2;{r};{g};{b}m{text} \033[38;2;255;255;255m"
 
 def extractnumbers(s):
     return tuple(map(int,re.findall("(\d+)\.(\d+)\.(\d+)",str(s))[0]))
 
 def toversionstring(major, minor, rev):
-    return str(major)+"."+str(minor)+"."+str(rev)
+    return f"{str(major)}.{str(minor)}.{str(rev)}"
 
 def topaddedversionstring(major, minor, rev):
     return str(major)+str(minor).zfill(3)+str(rev).zfill(3)
@@ -27,8 +27,15 @@ def topaddedversionstring(major, minor, rev):
 pipe = subprocess.Popen(["git", "rev-parse", "--abbrev-ref", "HEAD"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 branchresult = pipe.communicate()[0].decode().strip()
 
-if(branchresult != "master"):
-    print(colored(255, 0, 0, "We recommend that you release on master, you are on '"+branchresult+"'"))
+if (branchresult != "master"):
+    print(
+        colored(
+            255,
+            0,
+            0,
+            f"We recommend that you release on master, you are on '{branchresult}'",
+        )
+    )
 
 ret = subprocess.call(["git", "remote", "update"])
 
@@ -46,24 +53,24 @@ pipe = subprocess.Popen(["git", "rev-parse", "--show-toplevel"], stdout=subproce
 maindir = pipe.communicate()[0].decode().strip()
 scriptlocation = os.path.dirname(os.path.abspath(__file__))
 
-print("repository: "+maindir)
+print(f"repository: {maindir}")
 
 pipe = subprocess.Popen(["git", "describe", "--abbrev=0", "--tags"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 versionresult = pipe.communicate()[0].decode().strip()
 
-print("last version: "+versionresult )
+print(f"last version: {versionresult}")
 try:
   currentv = extractnumbers(versionresult)
 except:
   currentv = [0,0,0]
-if(len(sys.argv) != 2):
+if (len(sys.argv) != 2):
     nextv = (currentv[0],currentv[1], currentv[2]+1)
-    print ("please specify version number, e.g. "+toversionstring(*nextv))
+    print(f"please specify version number, e.g. {toversionstring(*nextv)}")
     sys.exit(-1)
 try:
     newversion = extractnumbers(sys.argv[1])
 except:
-    print("can't parse version number "+sys.argv[1])
+    print(f"can't parse version number {sys.argv[1]}")
     sys.exit(-1)
 
 print("checking that new version is valid")
@@ -80,17 +87,17 @@ else :
 
 atleastminor= (currentv[0] != newversion[0]) or (currentv[1] != newversion[1])
 
-if(atleastminor):
+if atleastminor:
     print(colored(0, 255, 0, "This is more than a revision."))
     releasefile = maindir + os.sep + "RELEASES.md"
     releasedata = open(releasefile).read()
     pattern = re.compile("#\s+\d+\.\d+")
     m = pattern.search(releasedata)
-    if(m == None):
+    if m is None:
         print(colored(255, 0, 0, "You are preparing a new minor release and you have not yet updated RELEASES.md."))
         sys.exit(-1)
 
-versionfilerel = os.sep + "include" + os.sep + "simdjson" + os.sep + "simdjson_version.h"
+versionfilerel = f"{os.sep}include{os.sep}simdjson{os.sep}simdjson_version.h"
 versionfile = maindir + versionfilerel
 
 with open(versionfile, 'w') as file:
@@ -107,26 +114,28 @@ with open(versionfile, 'w') as file:
     file.write("  /**\n")
     file.write("   * The major version (MAJOR.minor.revision) of simdjson being used.\n")
     file.write("   */\n")
-    file.write("  SIMDJSON_VERSION_MAJOR = "+str(newversion[0])+",\n")
+    file.write(f"  SIMDJSON_VERSION_MAJOR = {str(newversion[0])}" + ",\n")
     file.write("  /**\n")
     file.write("   * The minor version (major.MINOR.revision) of simdjson being used.\n")
     file.write("   */\n")
-    file.write("  SIMDJSON_VERSION_MINOR = "+str(newversion[1])+",\n")
+    file.write(f"  SIMDJSON_VERSION_MINOR = {str(newversion[1])}" + ",\n")
     file.write("  /**\n")
     file.write("   * The revision (major.minor.REVISION) of simdjson being used.\n")
     file.write("   */\n")
-    file.write("  SIMDJSON_VERSION_REVISION = "+str(newversion[2])+"\n")
+    file.write(f"  SIMDJSON_VERSION_REVISION = {str(newversion[2])}" + "\n")
     file.write("};\n")
     file.write("} // namespace simdjson\n")
     file.write("\n")
     file.write("#endif // SIMDJSON_SIMDJSON_VERSION_H\n")
 
-print(versionfile + " modified")
+print(f"{versionfile} modified")
 
 newmajorversionstring = str(newversion[0])
 mewminorversionstring = str(newversion[1])
 newrevversionstring = str(newversion[2])
-newversionstring = str(newversion[0]) + "." + str(newversion[1]) + "." + str(newversion[2])
+newversionstring = (
+    f"{str(newversion[0])}.{str(newversion[1])}.{str(newversion[2])}"
+)
 cmakefile = maindir + os.sep + "CMakeLists.txt"
 
 sonumber = None
@@ -135,9 +144,9 @@ with open (cmakefile, 'rt') as myfile:
     for line in myfile:
         m = pattern.search(line)
         if m != None:
-            sonumber = int(m.group(1))
+            sonumber = int(m[1])
             break
-print("so library number "+str(sonumber))
+print(f"so library number {str(sonumber)}")
 
 if(atleastminor):
     print("Given that we have a minor revision, it seems necessary to bump the so library number")
@@ -145,19 +154,31 @@ if(atleastminor):
     sonumber += 1
 
 for line in fileinput.input(cmakefile, inplace=1, backup='.bak'):
-    line = re.sub('    VERSION \d+\.\d+\.\d+','    VERSION '+newmajorversionstring+'.'+mewminorversionstring+'.'+newrevversionstring, line.rstrip())
-    line = re.sub('SIMDJSON_LIB_VERSION "\d+','SIMDJSON_LIB_VERSION "'+str(sonumber), line)
+    line = re.sub(
+        '    VERSION \d+\.\d+\.\d+',
+        f'    VERSION {newmajorversionstring}.{mewminorversionstring}.{newrevversionstring}',
+        line.rstrip(),
+    )
+    line = re.sub(
+        'SIMDJSON_LIB_VERSION "\d+',
+        f'SIMDJSON_LIB_VERSION "{str(sonumber)}',
+        line,
+    )
     line = re.sub('set\(SIMDJSON_LIB_SOVERSION \"\d+\"','set(SIMDJSON_LIB_SOVERSION \"'+str(sonumber)+'\"', line)
     print(line)
 
-print("modified "+cmakefile+", a backup was made")
+print(f"modified {cmakefile}, a backup was made")
 
 
 doxyfile = maindir + os.sep + "Doxyfile"
 for line in fileinput.input(doxyfile, inplace=1, backup='.bak'):
-    line = re.sub('PROJECT_NUMBER         = "\d+\.\d+\.\d+','PROJECT_NUMBER         = "'+newversionstring, line.rstrip())
+    line = re.sub(
+        'PROJECT_NUMBER         = "\d+\.\d+\.\d+',
+        f'PROJECT_NUMBER         = "{newversionstring}',
+        line.rstrip(),
+    )
     print(line)
-print("modified "+doxyfile+", a backup was made")
+print(f"modified {doxyfile}, a backup was made")
 
 
 
@@ -176,14 +197,22 @@ pattern = re.compile("https://simdjson.org/api/(\d+\.\d+\.\d+)/index.html")
 readmefile = maindir + os.sep + "README.md"
 readmedata = open(readmefile).read()
 m = pattern.search(readmedata)
-if m == None:
+if m is None:
     print('I cannot find a link to the API documentation in your README')
 else:
-    detectedreadme = m.group(1)
-    print("found a link to your API documentation in the README file: "+detectedreadme+" ("+toversionstring(*newversion)+")")
-    if(atleastminor):
-       if(detectedreadme != toversionstring(*newversion)):
-           print(colored(255, 0, 0, "Consider updating the readme link to "+toversionstring(*newversion)))
+    detectedreadme = m[1]
+    print(
+        f"found a link to your API documentation in the README file: {detectedreadme} ({toversionstring(*newversion)})"
+    )
+    if atleastminor and (detectedreadme != toversionstring(*newversion)):
+        print(
+            colored(
+                255,
+                0,
+                0,
+                f"Consider updating the readme link to {toversionstring(*newversion)}",
+            )
+        )
 
 
 
